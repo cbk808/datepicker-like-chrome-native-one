@@ -1645,7 +1645,7 @@
         '</div>',
         dateLabel: '<div class="dp-date-label">' +
         '<span class="dp-date-label-txt"></span>' +
-        '<span class="dp-date-label-arrow"></span>' +
+        '<span class="dp-date-label-arrow"> ↓</span>' +
         '</div>',
         buttonGroup: '<div class="dp-btn-group">' +
         '<div class="dp-btn-prev"></div>' +
