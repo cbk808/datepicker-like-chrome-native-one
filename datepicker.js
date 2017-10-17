@@ -1,10 +1,14 @@
 (function ($) {
-    var MIN_YEAR = 1800;
-    var MAX_YEAR = 2200;
+    // var MIN_TIME = -62167766400000;
+    var MIN_TIME = -62135712000000;
+    var MAX_TIME = 750736656000000;
+    var MIN_YEAR = 1;
+    var MAX_YEAR = 25759;
     var CONTINUOUS_SCROLLING_STEP = 5;
     var TRANSITION_FRAMES_COUNT = 18;
     var BEGIN_CONTINUOUS_SCROLLING_DELAY = 320;
     var ROW_HEIGHT = 20;
+    var MAX_OFFSET = Math.floor((MAX_TIME - MIN_TIME)/(7*24*3600000))*ROW_HEIGHT;
     var DAY_CELL_WIDTH = 34;
     var SCROLL_CONTAINER_WIDTH = 238;
     var CANVAS_HEIGHT = 140;
@@ -39,9 +43,7 @@
     })();
 
     var today;
-    var cordsOfToday;
     var selectedDay;
-    var cordsOfSelectedDay;
     var $domMain;
     var $domScrollContainer;
     var $domMonthView;
@@ -91,6 +93,8 @@
     var isAnimating = false;
     var totalFrames = null;
     var currentOffset = 0;
+    var currentTime;
+    var inRowOffset = 0;
     var stopOffset = 0;
     var currentMonth = null;
     var scrollDirection = null;
@@ -101,7 +105,8 @@
     function  scrollToOffset() {
         var step = (stopOffset - currentOffset) / totalFrames;
         currentOffset += Math.round(step);
-
+        currentTime = getTimeFromOffset(currentOffset);
+        inRowOffset = currentOffset - getOffset(currentTime);
         totalFrames--;
         if (totalFrames === 0) {
             stopMonthViewScroll();
@@ -124,7 +129,7 @@
 
     function scrollToPrevMonth() {
         // Having met the first month.
-        if (currentMonth === 0) return;
+        if (currentTime === MIN_TIME) return;
 
         prevMonthIndex();
         calcNewStopOffset();
@@ -137,7 +142,7 @@
 
     function scrollToNextMonth() {
         // Having met the last month.
-        if (currentMonth === MonthsData.effectiveLength - 1) return;
+        if (currentTime === MAX_TIME) return;
 
         nextMonthIndex();
         calcNewStopOffset();
@@ -150,7 +155,7 @@
 
     function startMonthViewScrollDown() {
         // Having met the first month.
-        if (currentMonth === 0) return;
+        if (currentTime === MIN_TIME) return;
 
         isWaitingForStop = true;
         isAnimating = true;
@@ -159,12 +164,16 @@
         updateState = function () {
             if (currentOffset <= CONTINUOUS_SCROLLING_STEP) {
                 currentOffset = 0;
+                currentTime = MIN_TIME;
+                inRowOffset = 0;
                 // Meet the top, then stop animation.
                 stopMonthViewScroll();
             } else {
                 currentOffset -= CONTINUOUS_SCROLLING_STEP;
+                currentTime = getTimeFromOffset(currentOffset);
+                inRowOffset = currentOffset - getOffset(currentTime);
                 if (getOffset(currentMonth) > currentOffset) {
-                    currentMonth--;
+                    prevMonthIndex();
 
                     // UI
                     DateLabel.update();
@@ -183,22 +192,25 @@
 
     function startMonthViewScrollUp() {
         // Having met the last month.
-        if (currentMonth === MonthsData.effectiveLength - 1) return;
+        if (currentTime === MAX_TIME) return;
 
         isWaitingForStop = true;
         isAnimating = true;
         totalFrames = 10000000;
         scrollDirection = 1;
         updateState = function () {
-            var maxOffset = getOffset(MonthsData.effectiveLength - 1);
-            if ((maxOffset - currentOffset) <= CONTINUOUS_SCROLLING_STEP) {
-                currentOffset = maxOffset;
+            if ((MAX_OFFSET - currentOffset) <= CONTINUOUS_SCROLLING_STEP) {
+                currentOffset = MAX_OFFSET;
+                currentTime = MAX_TIME;
+                inRowOffset = 0;
                 // Meet the bottom, then stop animation.
                 stopMonthViewScroll();
             } else {
                 currentOffset += CONTINUOUS_SCROLLING_STEP;
+                currentTime = getTimeFromOffset(currentOffset);
+                inRowOffset = currentOffset - getOffset(currentTime);
                 if (getOffset(currentMonth) < currentOffset) {
-                    currentMonth++;
+                    nextMonthIndex();
 
                     //UI
                     DateLabel.update();
@@ -219,22 +231,22 @@
         if (isWaitingForStop) {
             isWaitingForStop = false;
             // Scroll to the nearest month.
-            if (currentOffset < getOffset(MonthsData.effectiveLength - 1) && currentOffset > 0) {
+            if (currentTime < MAX_TIME && currentTime > MIN_TIME) {
                 if (scrollDirection === 1) { // up
-                    if (currentMonth < MonthsData.effectiveLength - 1) {
-                        currentMonth += 1;
+                    if (getStartTimeOfMonth(currentMonth) < MAX_TIME) {
+                        nextMonthIndex();
                         totalFrames = TRANSITION_FRAMES_COUNT;
                         calcNewStopOffset();
 
                         DateLabel.update();
                         updateScrollContainerHeight();
                     } else {
-                        totalFrames = Math.ceil((getOffset(MonthsData.effectiveLength - 1) - currentOffset)/5);
+                        totalFrames = Math.ceil((MAX_OFFSET - currentOffset)/5);
                         calcNewStopOffset();
                     }
                 } else { // down
-                    if (currentMonth > 0) {
-                        currentMonth -= 1;
+                    if (getStartTimeOfMonth(currentMonth) > MIN_TIME) {
+                        prevMonthIndex();
                         totalFrames = TRANSITION_FRAMES_COUNT;
                         calcNewStopOffset();
 
@@ -264,11 +276,11 @@
     var monthGridBottom;
     var yCurrentOffset = 0;
     var yScrollDirection = null;
-    var maxOffset = (MAX_YEAR - MIN_YEAR + 1)*YEAR_ROW_HEIGHT + MONTH_GRID_HEIGHT - YEAR_VIEW_SCROLL_CONTAINER_HEIGHT;
+    var maxOffset = 25759*YEAR_ROW_HEIGHT;
 
     function startYearViewScroll() {
         if ((yCurrentOffset === maxOffset && yScrollDirection === 1)
-            || (yCurrentOffset === 0 && yScrollDirection === -1)) {
+            || (yCurrentOffset === YEAR_ROW_HEIGHT && yScrollDirection === -1)) {
             return;
         }
 
@@ -284,10 +296,10 @@
                     isAnimating = false;
                 }
             } else { // Down
-                if (yCurrentOffset > scrollStep) {
+                if ((yCurrentOffset - YEAR_ROW_HEIGHT) > scrollStep) {
                     yCurrentOffset -= scrollStep;
                 } else {
-                    yCurrentOffset = 0;
+                    yCurrentOffset = YEAR_ROW_HEIGHT;
                     isAnimating = false;
                 }
             }
@@ -347,57 +359,63 @@
     // Canvas
     //region Canvas month view
     function drawMonthView() {
-        var index = Math.floor(currentOffset / ROW_HEIGHT);
-        var diff = currentOffset - index * ROW_HEIGHT;
-
         contextMonthViewBackground.save();
         contextMonthViewForeground.save();
-        contextMonthViewBackground.translate(0, -diff);
-        contextMonthViewForeground.translate(0, -diff);
+        contextMonthViewBackground.translate(0, -inRowOffset);
+        contextMonthViewForeground.translate(0, -inRowOffset);
         contextMonthViewBackground.clearRect(0, 0, $canvasMonthViewBackground[0].width, $canvasMonthViewBackground[0].height);
         contextMonthViewForeground.clearRect(0, 0, $canvasMonthViewForeground[0].width, $canvasMonthViewForeground[0].height);
 
+        var t;
         for (var i = 0; i < 7; i++) {
             for (var j = 0; j < 7; j++) {
-                contextMonthViewForeground.fillText(WeeksData[index + i][j], j * DAY_CELL_WIDTH + DAY_CELL_WIDTH/2, i * ROW_HEIGHT + ROW_HEIGHT/2);
-                if (cordsOfToday.i === (index + i) && cordsOfToday.col === j) {
+                t = new Date(currentTime + (i*7+j)*24*3600000);
+                contextMonthViewForeground.fillText(t.getDate(), j * DAY_CELL_WIDTH + DAY_CELL_WIDTH/2, i * ROW_HEIGHT + ROW_HEIGHT/2);
+                if (isSameDate(t, today)) {
                     drawTodayCellBorder(i, j);
                 }
                 if (selectedDay) {
-                    var cords = getCordsOfDate(selectedDay);
-                    if (cords.i === (index + i) && cords.col === j) {
+                    if (isSameDate(t, selectedDay)) {
                         drawSelectedDayCellBackground(i, j);
                     }
                 }
             }
         }
 
+
+
         contextMonthViewBackground.restore();
         contextMonthViewForeground.restore();
     }
 
     function drawOutsideDays() {
-        var w1_index = MonthsData[currentMonth][3];
-        var w2_index = MonthsData[currentMonth+1][3];
-        var w1 = WeeksData[w1_index];
-        var w2 = WeeksData[w2_index];
+        var d = new Date(currentMonth);
+        var w = d.getDay();
+        var n = daysInMonth(currentMonth);
+        var r = Math.ceil((d.getDay() + daysInMonth(currentMonth))/7);
 
         contextMonthViewForeground.save();
         contextMonthViewForeground.fillStyle = COLOR_OUTSIDE_DAY;
-        if (w1[0] > 1) {
-            for (var i=0;w1[i]>1;i++) {
-                contextMonthViewForeground.clearRect(DAY_CELL_WIDTH * i, 0, DAY_CELL_WIDTH, ROW_HEIGHT);
-                contextMonthViewForeground.fillText(w1[i], i * DAY_CELL_WIDTH + DAY_CELL_WIDTH/2, ROW_HEIGHT/2);
+
+        if (w > 0) {
+            d.setDate(d.getDate() - 1);
+            for (var i=w;i>0;i--, d.setDate(d.getDate()-1)) {
+                contextMonthViewForeground.clearRect(DAY_CELL_WIDTH * (i - 1), 0, DAY_CELL_WIDTH, ROW_HEIGHT);
+                contextMonthViewForeground.fillText(d.getDate(), (i - 1)* DAY_CELL_WIDTH + DAY_CELL_WIDTH/2, ROW_HEIGHT/2);
             }
         }
 
-        if (w2[0] > 1) {
-            var y = (w2_index - w1_index) * ROW_HEIGHT;
-            for (var i=6;w2[i]<7;i--) {
+        d = new Date(currentMonth);
+        d.setMonth(d.getMonth() + 1);
+        w = d.getDay();
+        y = (r - 1)*ROW_HEIGHT;
+        if (w > 0) {
+            for (var i=w,j=1;i<=6;i++,j++) {
                 contextMonthViewForeground.clearRect(DAY_CELL_WIDTH * i, y, DAY_CELL_WIDTH, ROW_HEIGHT);
-                contextMonthViewForeground.fillText(w2[i], i * DAY_CELL_WIDTH + DAY_CELL_WIDTH/2, y + ROW_HEIGHT/2);
+                contextMonthViewForeground.fillText(j, i * DAY_CELL_WIDTH + DAY_CELL_WIDTH/2, y + ROW_HEIGHT/2);
             }
         }
+
         contextMonthViewForeground.restore();
     }
 
@@ -429,14 +447,17 @@
         }
 
         // Draw selected day background
-        if (selectedDay && isSameDate(MonthsData[currentMonth], selectedDay)) {
-            var cords = getCordsOfDate(selectedDay);
-            drawSelectedDayCellBackground(cords.row, cords.col);
+        if (selectedDay && selectedDay >= currentTime && selectedDay <= (currentTime + 6*7*24*3600000)) {
+            row = Math.floor((selectedDay - currentTime)/(7*24*3600000));
+            col = Math.floor((selectedDay - currentTime)%(7*24*3600000)/(24*3600000));
+            drawSelectedDayCellBackground(row, col);
         }
 
         // Draw today cell border
-        if (isSameDate(MonthsData[currentMonth], today)) {
-            drawTodayCellBorder(cordsOfToday.row, cordsOfToday.col);
+        if (today >= currentTime &&  today <= (currentTime + 6*7*24*3600000)) {
+            row = Math.floor((today - currentTime)/(7*24*3600000));
+            col = Math.floor((today - currentTime)%(7*24*3600000)/(24*3600000));
+            drawTodayCellBorder(row, col);
         }
 
         contextMonthViewBackground.restore();
@@ -477,7 +498,7 @@
                 drawMonthGrid(ctx);
                 ctx.translate(0, MONTH_GRID_HEIGHT);
             }
-            drawYearItem(ctx, MIN_YEAR + i);
+            drawYearItem(ctx, i);
             ctx.translate(0, YEAR_ROW_HEIGHT);
         }
 
@@ -539,7 +560,7 @@
             diff = yCurrentOffset - index * YEAR_ROW_HEIGHT;
             ctx.translate(0, -diff);
             for (var i=index;i<=selectedYear;i++) {
-                drawYearItem(ctx, MIN_YEAR + i);
+                drawYearItem(ctx, i);
                 ctx.translate(0, YEAR_ROW_HEIGHT);
             }
             drawMonthGrid(ctx);
@@ -551,7 +572,7 @@
                     ctx.translate(0, collapsingMonthGridHeight);
                     ctx.clearRect(0, 0, YEAR_VIEW_SCROLL_CONTAINER_WIDTH, MONTH_GRID_HEIGHT - collapsingMonthGridHeight);
                 }
-                drawYearItem(ctx, MIN_YEAR + i);
+                drawYearItem(ctx, i);
                 ctx.translate(0, YEAR_ROW_HEIGHT);
             }
         } else {
@@ -573,7 +594,7 @@
                         ctx.translate(0, expandingMonthGridHeight);
                         ctx.clearRect(0, 0, YEAR_VIEW_SCROLL_CONTAINER_WIDTH, MONTH_GRID_HEIGHT - expandingMonthGridHeight);
                     }
-                    drawYearItem(ctx, MIN_YEAR + i);
+                    drawYearItem(ctx, i);
                     ctx.translate(0, YEAR_ROW_HEIGHT);
                 }
             } else if (yCurrentOffset < collapsingMonthGridBottom) {
@@ -587,7 +608,7 @@
                         ctx.translate(0, expandingMonthGridHeight);
                         ctx.clearRect(0, 0, YEAR_VIEW_SCROLL_CONTAINER_WIDTH, MONTH_GRID_HEIGHT - expandingMonthGridHeight);
                     }
-                    drawYearItem(ctx, MIN_YEAR + i);
+                    drawYearItem(ctx, i);
                     ctx.translate(0, YEAR_ROW_HEIGHT);
                 }
             } else {
@@ -600,7 +621,7 @@
                         ctx.translate(0, expandingMonthGridHeight);
                         ctx.clearRect(0, 0, YEAR_VIEW_SCROLL_CONTAINER_WIDTH, MONTH_GRID_HEIGHT - expandingMonthGridHeight)
                     }
-                    drawYearItem(ctx, MIN_YEAR + i);
+                    drawYearItem(ctx, i);
                     ctx.translate(0, YEAR_ROW_HEIGHT);
                 }
             }
@@ -611,11 +632,8 @@
     //region Dom update
     // Scroll container
     function updateScrollContainerHeight() {
-        if (WeeksData[MonthsData[currentMonth + 1][3]][0] > 1) {
-            $domScrollContainer.height((MonthsData[currentMonth + 1][3] - MonthsData[currentMonth][3] + 1)*ROW_HEIGHT);
-        } else {
-            $domScrollContainer.height((MonthsData[currentMonth + 1][3] - MonthsData[currentMonth][3])*ROW_HEIGHT);
-        }
+        var dt = new Date(currentMonth);
+        $domScrollContainer.height(Math.ceil((dt.getDay() + daysInMonth(dt))/7) * ROW_HEIGHT);
     }
     function updateThumbPosition(dy) {
         $domThumb.css('transform', 'translateY('+dy+'px)');
@@ -633,18 +651,19 @@
             $domDateLabelText.text(this._getDateStr(dt));
         },
         update: function () {
-            $domDateLabelText.text(this._getDateStr(MonthsData[currentMonth]));
+            $domDateLabelText.text(this._getDateStr(currentMonth));
         },
         _getDateStr: function(dt) {
-            return dt[0] + '年' + (dt[1] < 9?('0'+(dt[1]+1)):dt[1] + 1) + '月';
+            return new Date(dt).toDateString();
         }
     };
     //endregion
 
     // Month view
     function setMonthView(dt) {
-        currentMonth = dt[0]*12 - MonthsData[0][0]*12 + dt[1];
-        currentOffset = getOffset(currentMonth);
+        currentMonth = toFirstDayOfMonth(dt);
+        currentTime = getStartTimeOfMonth(currentMonth);
+        currentOffset = getOffset(currentTime);
         DateLabel.toDate(dt);
         updateScrollContainerHeight();
         drawMonthView();
@@ -681,20 +700,21 @@
     var inputNumbers = [];
     var keyboardInput = false;
 
-    function updateDateInput(date) {
-        inputYear = date[0];
-        inputMonth = date[1];
-        inputDay = date[2];
+    function updateDateInput(dt) {
+        var d = new Date(dt);
+        inputYear = d.getFullYear();
+        inputMonth = d.getMonth();
+        inputDay = d.getDate();
 
-        $domInputYear.text(date[0]);
-        $domInputMonth.text((date[1]>8)?(date[1]+1):('0'+(date[1]+1)));
-        $domInputDay.text(padMonthOrDay(date[2]));
+        $domInputYear.text(inputYear);
+        $domInputMonth.text(padMonthOrDay(inputMonth + 1));
+        $domInputDay.text(padMonthOrDay(inputDay));
 
         $domMain.hide();
     }
 
     function isInputDateValid() {
-        return inputYear && inputMonth && inputDay;
+        return inputYear && inputDay && inputMonth !== null;
     }
 
     function adjustDayOnYearChange() {
@@ -918,7 +938,7 @@
 
     function onClickIndicator() {
         if (isInputDateValid()) {
-            selectedDay = [inputYear, inputMonth, inputDay];
+            selectedDay = parseDateArray([inputYear, inputMonth + 1, inputDay]).getTime();
             setMonthView(selectedDay);
         } else {
             setMonthView(today);
@@ -1013,7 +1033,7 @@
             inputNumbers.push(n);
             inputYear = parseInt(inputNumbers.join(''));
             $domInputYear.text(inputYear);
-            if (inputNumbers.length === 4) {
+            if (inputNumbers.length === 6) {
                 nextEditableElement();
             }
         } else if (editableElement === $domInputMonth) {
@@ -1140,7 +1160,7 @@
                     onEditableElementBlur();
                 }
                 if (isInputDateValid()) {
-                    selectedDay = [inputYear, inputMonth, inputDay];
+                    selectedDay = parseDateArray([inputYear, inputMonth + 1, inputDay]);
                     setMonthView(selectedDay);
                 } else {
                     selectedDay = null;
@@ -1173,10 +1193,8 @@
     function DatePicker(options) {
         defaults = $.extend(defaults, options);
 
-        today = getDateArray(new Date());
-        cordsOfToday = getCordsOfDate(today);
-        currentMonth = searchDateInMonthsData(today);
-        currentOffset = getOffset(currentMonth);
+        today = Date.now();
+        currentOffset = getOffset(today);
         $domContainer = $(defaults.container);
         $domMain = $(Templates.panel);
         $domMonthView = $(Templates.monthView);
@@ -1330,13 +1348,6 @@
 
     }
 
-
-    // Prepare date pool
-    var WeeksData = [];
-    var MonthsData = [];
-    generateData(startWeekOfYear(MIN_YEAR), endWeekOfYear(MAX_YEAR));
-    MonthsData.effectiveLength = MonthsData.length - 1;
-
     function getDateArray(dt) {
         return [
             dt.getFullYear(),
@@ -1356,85 +1367,23 @@
     }
 
     function isSameDate(dt1, dt2) {
-        return dt1[0] === dt2[0] && dt1[1] === dt2[1];
+        var d1 = new Date(dt1);
+        var d2 = new Date(dt2);
+
+        return d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth() && d1.getDate() === d2.getDate();
     }
 
     function isLeapYear(year) {
         return (year % 4 === 0 && year % 100 !== 0) || (year % 400 === 0);
     }
 
-    function startWeekOfYear(y) {
-        var dt = new Date([y]);
-        var weekDay = dt.getDay();
-        dt.setTime(dt.getTime() - weekDay * 24 * 3600 * 1000);
-        return getDateArray(dt);
-    }
-
-    function endWeekOfYear(y) {
-        var dt = new Date([y + 1]);
-        var weekDay = dt.getDay();
-        var remainWeekDays = 0;
-
-        if (weekDay > 0) {
-            remainWeekDays = 7 - weekDay;
-        }
-
-        dt.setTime(dt.getTime() + (remainWeekDays + 14) * 24 * 3600 * 1000);
-
-        return getDateArray(dt);
-    }
-
-    function searchDateInMonthsData(date) {
-        for (var i = 0, len = MonthsData.effectiveLength; i < len; i++) {
-            if (MonthsData[i][0] === date[0] && MonthsData[i][1] === date[1]) {
-                return i;
-            }
-        }
-    }
-
-    function generateData(s, e) {
-        var daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-        var monthIndex = 0;
-        var i = 0;
-        for (; ;) {
-            var ar = [];
-            for (var j = 0; j < 7; j++) {
-                if (e[0] === s[0] && e[1] === s[1] && e[2] === s[2]) {
-                    return;
-                }
-
-                ar[j] = s[2];
-                if (s[2] === 1) {
-                    MonthsData[monthIndex++] = [s[0], s[1], s[2], i];
-                }
-                if (s[2] === 28 && s[1] === 1 && isLeapYear(s[0])) {
-                    s[2] = 29;
-                } else if (s[2] === 29 && s[1] === 1) {
-                    s[1] = 2;
-                    s[2] = 1;
-                } else {
-                    if (daysInMonth[s[1]] === s[2]) {
-                        if (s[1] === 11) {
-                            s[0] = s[0] + 1;
-                            s[1] = 0;
-                            s[2] = 1;
-                        } else {
-                            s[1] = s[1] + 1;
-                            s[2] = 1;
-                        }
-                    } else {
-                        s[2] = s[2] + 1;
-                    }
-                }
-            }
-            WeeksData[i] = ar;
-            i++;
-        }
-    }
-
     // Get a months's offset in MonthsData by its index.
-    function getOffset(index) {
-        return MonthsData[index][3] * ROW_HEIGHT;
+    function getOffset(time) {
+        return ROW_HEIGHT * Math.floor((time - MIN_TIME)/(24*7*3600000));
+    }
+
+    function getTimeFromOffset(offset) {
+        return MIN_TIME + Math.floor(offset/ROW_HEIGHT)*(24*7*3600000);
     }
 
     // Set a new stop offset for scroll animation.
@@ -1443,11 +1392,15 @@
     }
 
     function nextMonthIndex() {
-        return (currentMonth === MonthsData.effectiveLength) ? MonthsData.effectiveLength : ++currentMonth;
+        var d = new Date(currentMonth);
+        d.setMonth(d.getMonth() + 1);
+        currentMonth = d.getTime();
     }
 
     function prevMonthIndex() {
-        return (currentMonth === 0) ? 0 : --currentMonth;
+        var d = new Date(currentMonth);
+        d.setMonth(d.getMonth() - 1);
+        currentMonth = d.getTime();
     }
 
     // Timer for mouse down holding, if time elapsed is less than 320ms,
@@ -1475,6 +1428,41 @@
 
     function isHidden(el) {
         return el.offsetParent === null;
+    }
+
+    function daysInMonth(dt) {
+        var m1 = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+        var m2 = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+        var date = new Date(dt);
+        if (isLeapYear(date.getFullYear())) {
+            return m1[date.getMonth()];
+        } else {
+            return m2[date.getMonth()];
+        }
+    }
+
+    function getStartTimeOfMonth(dt) {
+        var d = new Date(dt);
+        d.setDate(1);
+        return d.getTime() - d.getDay() * 24 * 3600000;
+    }
+
+    function toFirstDayOfMonth(dt) {
+        var d = new Date(dt);
+        d.setDate(1);
+        d.setHours(0);
+        d.setMinutes(0);
+        d.setSeconds(0);
+        d.setMilliseconds(0);
+        return d.getTime();
+    }
+
+    function parseDateArray(ar) {
+        var d = new Date(0);
+        d.setFullYear(ar[0]);
+        d.setMonth(ar[1] - 1);
+        d.setDate(ar[2]);
+        return d.getTime();
     }
 
     var whichNavBtnDown = null;
@@ -1524,16 +1512,16 @@
         })
         .on('click', '.dp-date-label', function (e) {
             foregroundYearView();
-            setYearView(MonthsData[currentMonth][0] - MIN_YEAR);
+            setYearView(new Date(currentMonth).getFullYear());
         })
         .on('click', '.dp-year-scroll-box', function (e) {
             var y = (e.offsetY + yCurrentOffset);
             if (y > monthGridTop && y < monthGridBottom) { // Select a month
-                setMonthView([
-                    MIN_YEAR + expandedYear,
-                    Math.floor((y - monthGridTop)/MONTH_CELL_HEIGHT)*4 + Math.floor(e.offsetX/MONTH_CELL_WIDTH),
+                setMonthView(parseDateArray([
+                    expandedYear,
+                    Math.floor((y - monthGridTop)/MONTH_CELL_HEIGHT)*4 + Math.floor(e.offsetX/MONTH_CELL_WIDTH) + 1,
                     1
-                ]);
+                ]));
                 foregroundMonthView();
             } else { // Expand a year
                 if (y <= monthGridTop) {
@@ -1549,21 +1537,18 @@
         .on('click', '.dp-month-scroll-box', function (e) {
             var row = Math.floor(e.offsetY/ROW_HEIGHT);
             var col = Math.floor(e.offsetX/DAY_CELL_WIDTH);
-            var day = WeeksData[MonthsData[currentMonth][3] + row][col];
-            if (row === 0 && day > 7) {
+            var dt = currentTime + row * 24 * 7 * 3600000 + col * 24 * 3600000;
+            var d = new Date(dt);
+
+            if (row === 0 && d.getDate() > 7) {
                 scrollToPrevMonth();
-            } else if (row > 0 && day < 7) {
+            } else if (row > 2 && d.getDate() < 7) {
                 scrollToNextMonth();
             }
             DateLabel.update();
             updateScrollContainerHeight();
-            selectedDay = [
-                MonthsData[currentMonth][0],
-                MonthsData[currentMonth][1],
-                day
-            ];
+            selectedDay = dt;
             drawBackground();
-
             updateDateInput(selectedDay);
         })
         .on('click', '.dp-mask', function (e) {
@@ -1645,7 +1630,7 @@
         '</div>',
         dateLabel: '<div class="dp-date-label">' +
         '<span class="dp-date-label-txt"></span>' +
-        '<span class="dp-date-label-arrow"> ↓</span>' +
+        '<span class="dp-date-label-arrow"></span>' +
         '</div>',
         buttonGroup: '<div class="dp-btn-group">' +
         '<div class="dp-btn-prev"></div>' +
@@ -1678,12 +1663,12 @@
     };
 
     $.fn.DatePicker = function(opts) {
-        try {
+        // try {
             if (!opts) opts = {};
             opts.container = this;
             new DatePicker(opts);
-        } catch (e) {
-            console.error('There is something wrong with the options.');
-        }
+        // } catch (e) {
+        //     console.error('There is something wrong with the options.');
+        // }
     }
 })($);
