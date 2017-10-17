@@ -1,7 +1,8 @@
 (function ($) {
     // var MIN_TIME = -62167766400000;
-    var MIN_TIME = -62135712000000;
-    var MAX_TIME = 750736656000000;
+    var TIME_ZONE_OFFSET = new Date().getTimezoneOffset()*60*1000;
+    var MIN_TIME = -62135712000000 + 480 * 60 * 1000 + TIME_ZONE_OFFSET;
+    var MAX_TIME = 750736656000000 + 480 * 60 * 1000 + TIME_ZONE_OFFSET;
     var MIN_YEAR = 1;
     var MAX_YEAR = 25759;
     var CONTINUOUS_SCROLLING_STEP = 5;
@@ -98,7 +99,6 @@
     var stopOffset = 0;
     var currentMonth = null;
     var scrollDirection = null;
-
 
     //region Month view animation
     // Scroll to a calculated offset
@@ -654,7 +654,8 @@
             $domDateLabelText.text(this._getDateStr(currentMonth));
         },
         _getDateStr: function(dt) {
-            return new Date(dt).toDateString();
+            var d = new Date(dt);
+            return d.getFullYear() + '年'+ padMonthOrDay(d.getMonth()+1) + '月';
         }
     };
     //endregion
@@ -1630,7 +1631,7 @@
         '</div>',
         dateLabel: '<div class="dp-date-label">' +
         '<span class="dp-date-label-txt"></span>' +
-        '<span class="dp-date-label-arrow"></span>' +
+        '<span class="dp-date-label-arrow">↓</span>' +
         '</div>',
         buttonGroup: '<div class="dp-btn-group">' +
         '<div class="dp-btn-prev"></div>' +
