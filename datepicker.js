@@ -807,7 +807,7 @@
                 clearRepeatedTimer();
             }
         } else {
-            inputYear = today[0];
+            inputYear = new Date().getFullYear();
         }
         adjustDayOnYearChange();
         $domInputYear.text(inputYear);
@@ -822,7 +822,7 @@
                 clearRepeatedTimer();
             }
         } else {
-            inputYear = today[0];
+            inputYear = new Date().getFullYear();
         }
         adjustDayOnYearChange();
         $domInputYear.text(inputYear);
