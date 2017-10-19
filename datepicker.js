@@ -366,23 +366,21 @@
         contextMonthViewBackground.clearRect(0, 0, $canvasMonthViewBackground[0].width, $canvasMonthViewBackground[0].height);
         contextMonthViewForeground.clearRect(0, 0, $canvasMonthViewForeground[0].width, $canvasMonthViewForeground[0].height);
 
-        var t;
+        var t = new Date();
         for (var i = 0; i < 7; i++) {
             for (var j = 0; j < 7; j++) {
-                t = new Date(currentTime + (i*7+j)*24*3600000);
+                t.setTime(currentTime + (i*7+j)*24*3600000);
                 contextMonthViewForeground.fillText(t.getDate(), j * DAY_CELL_WIDTH + DAY_CELL_WIDTH/2, i * ROW_HEIGHT + ROW_HEIGHT/2);
-                if (isSameDate(t, today)) {
+                if (isSameDate(t.getTime(), today)) {
                     drawTodayCellBorder(i, j);
                 }
                 if (selectedDay) {
-                    if (isSameDate(t, selectedDay)) {
+                    if (isSameDate(t.getTime(), selectedDay)) {
                         drawSelectedDayCellBackground(i, j);
                     }
                 }
             }
         }
-
-
 
         contextMonthViewBackground.restore();
         contextMonthViewForeground.restore();
@@ -392,7 +390,7 @@
         var d = new Date(currentMonth);
         var w = d.getDay();
         var n = daysInMonth(currentMonth);
-        var r = Math.ceil((d.getDay() + daysInMonth(currentMonth))/7);
+        var r = Math.ceil((d.getDay() + n)/7);
 
         contextMonthViewForeground.save();
         contextMonthViewForeground.fillStyle = COLOR_OUTSIDE_DAY;
@@ -627,6 +625,10 @@
             }
         }
     }
+
+    function clearYearViewBackground() {
+        contextYearViewBackground.clearRect(0, 0, $canvasMonthViewBackground[0].width, $canvasMonthViewBackground[0].height);
+    }
     //endregion
 
     //region Dom update
@@ -648,10 +650,10 @@
 
         },
         toDate: function (dt) {
-            $domDateLabelText.text(this._getDateStr(dt));
+            $domDateLabelText[0].innerText = (this._getDateStr(dt));
         },
         update: function () {
-            $domDateLabelText.text(this._getDateStr(currentMonth));
+            $domDateLabelText[0].innerText = (this._getDateStr(currentMonth));
         },
         _getDateStr: function (dt) {
             var d = new Date(dt);
@@ -938,13 +940,21 @@
         inputYear = inputMonth = inputDay = null;
     }
 
-    function onClickIndicator() {
+    function onClickIndicator(e) {
+        e.stopPropagation();
+        if (keyboardInput) {
+            keyboardInput = false;
+            onEditableElementBlur();
+        }
         if (isInputDateValid()) {
-            selectedDay = parseDateArray([inputYear, inputMonth + 1, inputDay]).getTime();
+            selectedDay = parseDateArray([inputYear, inputMonth + 1, inputDay]);
             setMonthView(selectedDay);
         } else {
+            selectedDay = null;
             setMonthView(today);
         }
+        foregroundMonthView();
+        $domMain.show();
     }
 
     function onDatePickerBlur() {
@@ -1163,20 +1173,7 @@
                 onSpinDownBtnUp();
             })
             .on('mousedown', '.dp-indicator', function (e) {
-                e.stopPropagation();
-                if (keyboardInput) {
-                    keyboardInput = false;
-                    onEditableElementBlur();
-                }
-                if (isInputDateValid()) {
-                    selectedDay = parseDateArray([inputYear, inputMonth + 1, inputDay]);
-                    setMonthView(selectedDay);
-                } else {
-                    selectedDay = null;
-                    setMonthView(today);
-                }
-                foregroundMonthView();
-                $domMain.show();
+                onClickIndicator(e);
             })
             .on('mousedown', '.dp-input-year, .dp-input-month, .dp-input-day', function(e) {
                 e.stopPropagation();
@@ -1429,6 +1426,9 @@
                     }
                 }
             })
+            .on('mouseleave', '.dp-year-scroll-box', function (e) {
+                clearYearViewBackground();
+            })
             .on('click', '.dp-month-scroll-box', function (e) {
                 var row = Math.floor(e.offsetY/ROW_HEIGHT);
                 var col = Math.floor(e.offsetX/DAY_CELL_WIDTH);
@@ -1500,10 +1500,7 @@
     }
 
     function isSameDate(dt1, dt2) {
-        var d1 = new Date(dt1);
-        var d2 = new Date(dt2);
-
-        return d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth() && d1.getDate() === d2.getDate();
+        return Math.floor((dt1 - MIN_TIME)/(24*3600*1000)) === Math.floor((dt2 - MIN_TIME)/(24*3600*1000));
     }
 
     function isLeapYear(year) {
