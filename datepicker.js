@@ -71,7 +71,7 @@
     var $canvasYearViewForeground;
     var contextYearViewBackground;
     var contextYearViewForeground;
-    
+
     var $canvasOffScreen;
     var contextOffScreen;
 
@@ -633,13 +633,13 @@
     // Scroll container
     function updateScrollContainerHeight() {
         var dt = new Date(currentMonth);
-        $domScrollContainer.height(Math.ceil((dt.getDay() + daysInMonth(dt))/7) * ROW_HEIGHT);
+        $domScrollContainer[0].style.height = (Math.ceil((dt.getDay() + daysInMonth(dt))/7) * ROW_HEIGHT) + 'px';
     }
     function updateThumbPosition(dy) {
         $domThumb.css('transform', 'translateY('+dy+'px)');
     }
     // Date label
-    DateLabel = {
+    var DateLabel = {
         year: null,
         month: null,
         toNextMonth: function () {
@@ -653,9 +653,9 @@
         update: function () {
             $domDateLabelText.text(this._getDateStr(currentMonth));
         },
-        _getDateStr: function(dt) {
+        _getDateStr: function (dt) {
             var d = new Date(dt);
-            return d.getFullYear() + '年'+ padMonthOrDay(d.getMonth()+1) + '月';
+            return d.getFullYear() + '年' + padMonthOrDay(d.getMonth() + 1) + '月';
         }
     };
     //endregion
@@ -807,7 +807,7 @@
                 clearRepeatedTimer();
             }
         } else {
-            inputYear = new Date().getFullYear();
+            inputYear = today[0];
         }
         adjustDayOnYearChange();
         $domInputYear.text(inputYear);
@@ -822,7 +822,7 @@
                 clearRepeatedTimer();
             }
         } else {
-            inputYear = new Date().getFullYear();
+            inputYear = today[0];
         }
         adjustDayOnYearChange();
         $domInputYear.text(inputYear);
@@ -1305,6 +1305,7 @@
             $domInputButtonGroup.appendTo($domInput.find('.dp-input-inner-wrapper'));
             initDateInput();
             initTimeInput();
+            initInteraction();
         },
         onBtnPrevMonthDown: function () {
             setTimer(startMonthViewScrollDown, BEGIN_CONTINUOUS_SCROLLING_DELAY);
@@ -1349,22 +1350,144 @@
 
     }
 
-    function getDateArray(dt) {
-        return [
-            dt.getFullYear(),
-            dt.getMonth(),
-            dt.getDate()
-        ];
-    }
+    function initInteraction() {
+        var whichNavBtnDown = null;
+        var isMouseDownOnThumb = false;
+        var oThumbOffset;
+        var oy = 0;
+        var dy = 0;
 
-    function getCordsOfDate(dt) {
-        var i = MonthsData[dt[0]*12 - MonthsData[0][0]*12 + dt[1]][3];
-        var wk = WeeksData[i];
-        return {
-            i: i + Math.ceil((wk.indexOf(1) + dt[2])/7) - 1,
-            row: Math.ceil((wk.indexOf(1) + dt[2])/7) - 1,
-            col: (wk.indexOf(1) + dt[2] - 1)%7
-        }
+        $(document)
+            .on('mousedown', '.dp-btn-prev', function (e) {
+                whichNavBtnDown = 'prev';
+                DatePicker.prototype.onBtnPrevMonthDown();
+            })
+            .on('mousedown', '.dp-btn-next', function (e) {
+                whichNavBtnDown = 'next';
+                DatePicker.prototype.onBtnNextMonthDown();
+            })
+            .on('mouseup', '.dp-btn-prev', function (e) {
+                if (whichNavBtnDown === 'prev') {
+                    DatePicker.prototype.onBtnPrevMonthUp();
+                    whichNavBtnDown = null;
+                }
+            })
+            .on('mouseup', '.dp-btn-next', function (e) {
+                if (whichNavBtnDown === 'next') {
+                    DatePicker.prototype.onBtnNextMonthUp();
+                    whichNavBtnDown = null;
+                }
+            })
+            .on('mouseleave', '.dp-btn-next,.dp-btn-prev', function (e) {
+
+            })
+            .on('mouseup', function (e) {
+                if (whichNavBtnDown === 'prev') {
+                    DatePicker.prototype.onBtnPrevMonthUp();
+                    whichNavBtnDown = null;
+                } else if (whichNavBtnDown === 'next') {
+                    DatePicker.prototype.onBtnNextMonthUp();
+                    whichNavBtnDown = null;
+                }
+            })
+            .on('mousemove', '.dp-month-scroll-box', function (e) {
+                drawBackground(e.offsetX, e.offsetY);
+            })
+            .on('click', '.dp-btn-curr', function (e) {
+                DatePicker.prototype.onClickBtnToday(e);
+            })
+            .on('click', '.dp-date-label', function (e) {
+                foregroundYearView();
+                setYearView(new Date(currentMonth).getFullYear());
+            })
+            .on('click', '.dp-year-scroll-box', function (e) {
+                var y = (e.offsetY + yCurrentOffset);
+                if (y > monthGridTop && y < monthGridBottom) { // Select a month
+                    setMonthView(parseDateArray([
+                        expandedYear,
+                        Math.floor((y - monthGridTop)/MONTH_CELL_HEIGHT)*4 + Math.floor(e.offsetX/MONTH_CELL_WIDTH) + 1,
+                        1
+                    ]));
+                    foregroundMonthView();
+                } else { // Expand a year
+                    if (y <= monthGridTop) {
+                        selectedYear = Math.floor(y/YEAR_ROW_HEIGHT);
+                    } else {
+                        selectedYear = Math.floor((y - MONTH_GRID_HEIGHT)/YEAR_ROW_HEIGHT);
+                    }
+                    if (selectedYear !== expandedYear) {
+                        startYearViewFoldAnimation();
+                    }
+                }
+            })
+            .on('click', '.dp-month-scroll-box', function (e) {
+                var row = Math.floor(e.offsetY/ROW_HEIGHT);
+                var col = Math.floor(e.offsetX/DAY_CELL_WIDTH);
+                var dt = currentTime + row * 24 * 7 * 3600000 + col * 24 * 3600000;
+                var d = new Date(dt);
+
+                if (row === 0 && d.getDate() > 7) {
+                    scrollToPrevMonth();
+                } else if (row > 2 && d.getDate() < 7) {
+                    scrollToNextMonth();
+                }
+                DateLabel.update();
+                updateScrollContainerHeight();
+                selectedDay = dt;
+                drawBackground();
+                updateDateInput(selectedDay);
+            })
+            .on('click', '.dp-mask', function (e) {
+                foregroundMonthView();
+            })
+            .on('mousedown', '.dp-scroll-bar', function (e) {
+                isMouseDownOnThumb = true;
+                oy = e.screenY;
+                if (e.target === $domThumb[0]) {
+                    e.offsetY = e.offsetY + (YEAR_VIEW_SCROLL_CONTAINER_HEIGHT - THUMB_HEIGHT)/2;
+                }
+                oThumbOffset = e.offsetY - YEAR_VIEW_SCROLL_CONTAINER_HEIGHT/2;
+                if (Math.abs(oThumbOffset) > ((YEAR_VIEW_SCROLL_CONTAINER_HEIGHT - THUMB_HEIGHT)/2)) {
+                    scrollStep = MAX_SCROLL_STEP;
+                    updateThumbPosition(Math.sign(oThumbOffset)*(YEAR_VIEW_SCROLL_CONTAINER_HEIGHT - THUMB_HEIGHT)/2)
+                } else {
+                    scrollStep = Math.round(Math.abs(oThumbOffset)/((YEAR_VIEW_SCROLL_CONTAINER_HEIGHT - THUMB_HEIGHT)/2/MAX_SCROLL_STEP));
+                    updateThumbPosition(oThumbOffset);
+                }
+                yScrollDirection = Math.sign(oThumbOffset);
+                startYearViewScroll();
+            })
+            .on('mouseup', function (e) {
+                if (isMouseDownOnThumb) {
+                    isMouseDownOnThumb = false;
+                    isAnimating = false;
+                    $domThumb.css('transform', 'none');
+                }
+            })
+            .on('mousemove', function (e) {
+                var thumbOffset;
+                if (isMouseDownOnThumb) {
+                    dy = e.screenY - oy;
+                    thumbOffset = oThumbOffset + dy;
+                    yScrollDirection = thumbOffset >= 0 ? 1 : -1;
+                    if (YEAR_VIEW_SCROLL_CONTAINER_HEIGHT / 2 < Math.abs(thumbOffset)) {
+                        thumbOffset -= thumbOffset % (YEAR_VIEW_SCROLL_CONTAINER_HEIGHT / 2);
+                    }
+                    if (Math.abs(thumbOffset) > (YEAR_VIEW_SCROLL_CONTAINER_HEIGHT / 2 - THUMB_HEIGHT/2)) {
+                        scrollStep = MAX_SCROLL_STEP;
+                        updateThumbPosition(thumbOffset -= thumbOffset % ((YEAR_VIEW_SCROLL_CONTAINER_HEIGHT - THUMB_HEIGHT) / 2));
+                    } else {
+                        scrollStep = Math.round(Math.abs(thumbOffset)/((YEAR_VIEW_SCROLL_CONTAINER_HEIGHT - THUMB_HEIGHT)/2/MAX_SCROLL_STEP));
+                        updateThumbPosition(thumbOffset);
+                    }
+                    if (!isAnimating) {
+                        startYearViewScroll();
+                    }
+                }
+            })
+            .on('mousemove', '.dp-year-scroll-box', function (e) {
+                drawMonthGridBackground(contextYearViewBackground, e.offsetX, e.offsetY);
+            });
     }
 
     function isSameDate(dt1, dt2) {
@@ -1466,145 +1589,7 @@
         return d.getTime();
     }
 
-    var whichNavBtnDown = null;
-    var isMouseDownOnThumb = false;
-    var oThumbOffset;
-    var oy = 0;
-    var dy = 0;
-
-    $(document)
-        .on('mousedown', '.dp-btn-prev', function (e) {
-            whichNavBtnDown = 'prev';
-            DatePicker.prototype.onBtnPrevMonthDown();
-        })
-        .on('mousedown', '.dp-btn-next', function (e) {
-            whichNavBtnDown = 'next';
-            DatePicker.prototype.onBtnNextMonthDown();
-        })
-        .on('mouseup', '.dp-btn-prev', function (e) {
-            if (whichNavBtnDown === 'prev') {
-                DatePicker.prototype.onBtnPrevMonthUp();
-                whichNavBtnDown = null;
-            }
-        })
-        .on('mouseup', '.dp-btn-next', function (e) {
-            if (whichNavBtnDown === 'next') {
-                DatePicker.prototype.onBtnNextMonthUp();
-                whichNavBtnDown = null;
-            }
-        })
-        .on('mouseleave', '.dp-btn-next,.dp-btn-prev', function (e) {
-
-        })
-        .on('mouseup', function (e) {
-            if (whichNavBtnDown === 'prev') {
-                DatePicker.prototype.onBtnPrevMonthUp();
-                whichNavBtnDown = null;
-            } else if (whichNavBtnDown === 'next') {
-                DatePicker.prototype.onBtnNextMonthUp();
-                whichNavBtnDown = null;
-            }
-        })
-        .on('mousemove', '.dp-month-scroll-box', function (e) {
-            drawBackground(e.offsetX, e.offsetY);
-        })
-        .on('click', '.dp-btn-curr', function (e) {
-            DatePicker.prototype.onClickBtnToday(e);
-        })
-        .on('click', '.dp-date-label', function (e) {
-            foregroundYearView();
-            setYearView(new Date(currentMonth).getFullYear());
-        })
-        .on('click', '.dp-year-scroll-box', function (e) {
-            var y = (e.offsetY + yCurrentOffset);
-            if (y > monthGridTop && y < monthGridBottom) { // Select a month
-                setMonthView(parseDateArray([
-                    expandedYear,
-                    Math.floor((y - monthGridTop)/MONTH_CELL_HEIGHT)*4 + Math.floor(e.offsetX/MONTH_CELL_WIDTH) + 1,
-                    1
-                ]));
-                foregroundMonthView();
-            } else { // Expand a year
-                if (y <= monthGridTop) {
-                    selectedYear = Math.floor(y/YEAR_ROW_HEIGHT);
-                } else {
-                    selectedYear = Math.floor((y - MONTH_GRID_HEIGHT)/YEAR_ROW_HEIGHT);
-                }
-                if (selectedYear !== expandedYear) {
-                    startYearViewFoldAnimation();
-                }
-            }
-        })
-        .on('click', '.dp-month-scroll-box', function (e) {
-            var row = Math.floor(e.offsetY/ROW_HEIGHT);
-            var col = Math.floor(e.offsetX/DAY_CELL_WIDTH);
-            var dt = currentTime + row * 24 * 7 * 3600000 + col * 24 * 3600000;
-            var d = new Date(dt);
-
-            if (row === 0 && d.getDate() > 7) {
-                scrollToPrevMonth();
-            } else if (row > 2 && d.getDate() < 7) {
-                scrollToNextMonth();
-            }
-            DateLabel.update();
-            updateScrollContainerHeight();
-            selectedDay = dt;
-            drawBackground();
-            updateDateInput(selectedDay);
-        })
-        .on('click', '.dp-mask', function (e) {
-            foregroundMonthView();
-        })
-        .on('mousedown', '.dp-scroll-bar', function (e) {
-            isMouseDownOnThumb = true;
-            oy = e.screenY;
-            if (e.target === $domThumb[0]) {
-                e.offsetY = e.offsetY + (YEAR_VIEW_SCROLL_CONTAINER_HEIGHT - THUMB_HEIGHT)/2;
-            }
-            oThumbOffset = e.offsetY - YEAR_VIEW_SCROLL_CONTAINER_HEIGHT/2;
-            if (Math.abs(oThumbOffset) > ((YEAR_VIEW_SCROLL_CONTAINER_HEIGHT - THUMB_HEIGHT)/2)) {
-                scrollStep = MAX_SCROLL_STEP;
-                updateThumbPosition(Math.sign(oThumbOffset)*(YEAR_VIEW_SCROLL_CONTAINER_HEIGHT - THUMB_HEIGHT)/2)
-            } else {
-                scrollStep = Math.round(Math.abs(oThumbOffset)/((YEAR_VIEW_SCROLL_CONTAINER_HEIGHT - THUMB_HEIGHT)/2/MAX_SCROLL_STEP));
-                updateThumbPosition(oThumbOffset);
-            }
-            yScrollDirection = Math.sign(oThumbOffset);
-            startYearViewScroll();
-        })
-        .on('mouseup', function (e) {
-            if (isMouseDownOnThumb) {
-                isMouseDownOnThumb = false;
-                isAnimating = false;
-                $domThumb.css('transform', 'none');
-            }
-        })
-        .on('mousemove', function (e) {
-            var thumbOffset;
-            if (isMouseDownOnThumb) {
-                dy = e.screenY - oy;
-                thumbOffset = oThumbOffset + dy;
-                yScrollDirection = thumbOffset >= 0 ? 1 : -1;
-                if (YEAR_VIEW_SCROLL_CONTAINER_HEIGHT / 2 < Math.abs(thumbOffset)) {
-                    thumbOffset -= thumbOffset % (YEAR_VIEW_SCROLL_CONTAINER_HEIGHT / 2);
-                }
-                if (Math.abs(thumbOffset) > (YEAR_VIEW_SCROLL_CONTAINER_HEIGHT / 2 - THUMB_HEIGHT/2)) {
-                    scrollStep = MAX_SCROLL_STEP;
-                    updateThumbPosition(thumbOffset -= thumbOffset % ((YEAR_VIEW_SCROLL_CONTAINER_HEIGHT - THUMB_HEIGHT) / 2));
-                } else {
-                    scrollStep = Math.round(Math.abs(thumbOffset)/((YEAR_VIEW_SCROLL_CONTAINER_HEIGHT - THUMB_HEIGHT)/2/MAX_SCROLL_STEP));
-                    updateThumbPosition(thumbOffset);
-                }
-                if (!isAnimating) {
-                    startYearViewScroll();
-                }
-            }
-        })
-        .on('mousemove', '.dp-year-scroll-box', function (e) {
-            drawMonthGridBackground(contextYearViewBackground, e.offsetX, e.offsetY);
-        });
-
-    Templates = {
+    var Templates = {
         panel: '<div class="dp-calendar">' +
         '<div class="dp-mask"></div>' +
         '<div class="dp-inner-wrapper">' +
@@ -1665,9 +1650,9 @@
 
     $.fn.DatePicker = function(opts) {
         // try {
-            if (!opts) opts = {};
-            opts.container = this;
-            new DatePicker(opts);
+        if (!opts) opts = {};
+        opts.container = this;
+        new DatePicker(opts);
         // } catch (e) {
         //     console.error('There is something wrong with the options.');
         // }
