@@ -2,7 +2,7 @@
     $.fn.DatePicker = function(opts) {
         if (!opts) opts = {};
         opts.container = this;
-        factory($, opts);
+        return factory($, opts);
     }
 })(function($, opts) {
     var TIME_ZONE_OFFSET = new Date().getTimezoneOffset()*60*1000;
@@ -1330,6 +1330,13 @@
             initDateInput();
             initTimeInput();
             initInteraction(this);
+        },
+        val: function() {
+            if (isInputDateValid()) {
+                return padYear(inputYear) + '-' + padMonthOrDay(inputMonth + 1) + '-' + padMonthOrDay(inputDay);
+            } else {
+                return '';
+            }
         },
         onBtnPrevMonthDown: function () {
             setTimer(startMonthViewScrollDown, BEGIN_CONTINUOUS_SCROLLING_DELAY);
