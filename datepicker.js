@@ -510,7 +510,7 @@
         ctx.fillStyle = COLOR_YEAR_VIEW_BACKGROUND;
         ctx.fillRect(0, 0, YEAR_VIEW_SCROLL_CONTAINER_WIDTH, YEAR_ROW_HEIGHT);
         ctx.fillStyle = '#000';
-        ctx.fillText(year, 20,  YEAR_ROW_HEIGHT/2);
+        ctx.fillText(padYear(year), 20,  YEAR_ROW_HEIGHT/2);
         ctx.strokeStyle = COLOR_YEAR_BORDER_BOTTOM;
         ctx.beginPath();
         ctx.moveTo(0, YEAR_ROW_HEIGHT);
@@ -655,7 +655,7 @@
         },
         _getDateStr: function (dt) {
             var d = new Date(dt);
-            return d.getFullYear() + '年' + padMonthOrDay(d.getMonth() + 1) + '月';
+            return padYear(d.getFullYear()) + '年' + padMonthOrDay(d.getMonth() + 1) + '月';
         }
     };
     //endregion
@@ -707,11 +707,12 @@
         inputMonth = d.getMonth();
         inputDay = d.getDate();
 
-        $domInputYear.text(inputYear);
+        $domInputYear.text(padYear(inputYear));
         $domInputMonth.text(padMonthOrDay(inputMonth + 1));
         $domInputDay.text(padMonthOrDay(inputDay));
 
         $domMain.hide();
+        $domInputClear.show();
     }
 
     function isInputDateValid() {
@@ -810,7 +811,7 @@
             inputYear = new Date(today).getFullYear();
         }
         adjustDayOnYearChange();
-        $domInputYear.text(inputYear);
+        $domInputYear.text(padYear(inputYear));
     }
 
     function decreaseYear() {
@@ -825,7 +826,7 @@
             inputYear = new Date().getFullYear();
         }
         adjustDayOnYearChange();
-        $domInputYear.text(inputYear);
+        $domInputYear.text(padYear(inputYear));
     }
 
     function increaseMonth() {
@@ -1000,10 +1001,10 @@
         if (inputYear !== null) {
             if (inputYear > MAX_YEAR) {
                 inputYear = MAX_YEAR;
-                $domInputYear.text(inputYear);
+                $domInputYear.text(padYear(inputYear));
             } else if (inputYear < MIN_YEAR) {
                 inputYear = MIN_YEAR;
-                $domInputYear.text(inputYear);
+                $domInputYear.text(padYear(inputYear));
             }
             adjustDayOnYearChange();
         }
@@ -1033,7 +1034,7 @@
         if (editableElement === $domInputYear) {
             inputNumbers.push(n);
             inputYear = parseInt(inputNumbers.join(''));
-            $domInputYear.text(inputYear);
+            $domInputYear.text(padYear(inputYear));
             if (inputNumbers.length === 6) {
                 nextEditableElement();
             }
@@ -1091,6 +1092,7 @@
                     break;
                 default:
                     if (evt.keyCode >= 48 && evt.keyCode <= 57) {
+                        $domInputClear.show();
                         onInputNumber(evt.keyCode - 48);
                     }
             }
@@ -1113,6 +1115,9 @@
     function initDateInput() {
         $domContainer.empty().append($domInput).append($domMain)
             .focus(function (e) {
+                if (isInputDateValid()) {
+                    $domInputClear.show();
+                }
                 if (!editableElement) {
                     highlightEditableElement($domInputYear);
                 }
@@ -1128,6 +1133,7 @@
                 clearRepeatedTimer();
             })
             .on('mousedown', '.dp-spin-up', function (e) {
+                $domInputClear.show();
                 if (keyboardInput) {
                     keyboardInput = false;
                     onEditableElementBlur();
@@ -1135,6 +1141,7 @@
                 onSpinUpBtnDown();
             })
             .on('click', '.dp-btn-clear', function (e) {
+                $domInputClear.hide();
                 if (keyboardInput) {
                     keyboardInput = false;
                     onEditableElementBlur();
@@ -1145,6 +1152,7 @@
                 onSpinUpBtnUp();
             })
             .on('mousedown', '.dp-spin-down', function (e) {
+                $domInputClear.show();
                 if (keyboardInput) {
                     keyboardInput = false;
                     onEditableElementBlur();
@@ -1214,6 +1222,7 @@
         $domInputSpinUp = $domInput.find('.dp-spin-up');
         $domInputSpinDown = $domInput.find('.dp-spin-down');
         $domInputIndicator = $domInput.find('.dp-indicator');
+        $domInputClear = $domInput.find('.dp-btn-clear');
 
         $canvasMonthViewBackground = $domMonthView.find('.dp-month-canvas-background');
         $canvasMonthViewForeground = $domMonthView.find('.dp-month-canvas-foreground');
@@ -1550,6 +1559,15 @@
         return n < 10?'0'+n:n;
     }
 
+    function padYear(n) {
+        if (n < 1000) {
+            var str = "0000";
+            return str.substring(0, str.length - n.toString().length) + n;
+        } else {
+            return n;
+        }
+    }
+
     function isHidden(el) {
         return el.offsetParent === null;
     }
@@ -1640,11 +1658,11 @@
         '</div>' +
         '</div>',
         inputButtonGroup: '<div class="dp-input-btn-group">' +
-        '<div class="dp-btn-clear"></div>' +
+        '<div class="dp-btn-clear">&#xe604;</div>' +
         '<div class="dp-input-spin">' +
-        '<div class="dp-spin-up"></div>' +
-        '<div class="dp-spin-down"></div></div>' +
-        '<div class="dp-indicator"></div>' +
+        '<div class="dp-spin-up">&#xe62d;</div>' +
+        '<div class="dp-spin-down">&#xe62e;</div></div>' +
+        '<div class="dp-indicator">&#xe64a;</div>' +
         '</div>'
     };
 
