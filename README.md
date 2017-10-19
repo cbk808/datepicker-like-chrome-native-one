@@ -8,5 +8,6 @@ Simple simulation of the native datepicker in the webkit browser, and it is stil
 - *zepto* library
 # Usage
 ```javascript
-$('#container').DatePicker();
+var dp = $('#container').DatePicker();
+var dt = dp.val();
 ```
