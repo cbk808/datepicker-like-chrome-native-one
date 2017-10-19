@@ -45,6 +45,9 @@
 
     var today;
     var selectedDay;
+    var $domContainer;
+    var $domDateLabel;
+    var $domDateLabelText;
     var $domMain;
     var $domScrollContainer;
     var $domMonthView;
@@ -1206,6 +1209,7 @@
     function DatePicker(options) {
         defaults = $.extend(defaults, options);
 
+        this.id = generateUniqueId();
         today = Date.now();
         currentOffset = getOffset(today);
         $domContainer = $(defaults.container);
@@ -1609,6 +1613,13 @@
         d.setMonth(ar[1] - 1);
         d.setDate(ar[2]);
         return d.getTime();
+    }
+
+    function generateUniqueId() {
+        if (!generateUniqueId.id) {
+            generateUniqueId.id = 1;
+        }
+        return generateUniqueId.id++;
     }
 
     var Templates = {
