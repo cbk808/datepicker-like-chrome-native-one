@@ -703,7 +703,7 @@
     var inputNumbers = [];
     var keyboardInput = false;
 
-    function updateDateInput(dt) {
+    function closeCalendarPanel(dt, delay) {
         var d = new Date(dt);
         inputYear = d.getFullYear();
         inputMonth = d.getMonth();
@@ -713,7 +713,14 @@
         $domInputMonth.text(padMonthOrDay(inputMonth + 1));
         $domInputDay.text(padMonthOrDay(inputDay));
 
-        $domMain.hide();
+        if (delay) {
+            setTimeout(function() {
+                $domMain.hide();
+            }, 100);
+        } else {
+            $domMain.hide();
+        }
+
         $domInputClear.show();
     }
 
@@ -1345,7 +1352,7 @@
             selectedDay = today;
             setMonthView(today);
 
-            updateDateInput(today);
+            closeCalendarPanel(today);
         },
         _fillWeeksTitle: function () {
             $domMonthView.find('.dp-weeks-title').append($(Templates.weeksTitle));
@@ -1444,7 +1451,7 @@
                 updateScrollContainerHeight();
                 selectedDay = dt;
                 drawBackground();
-                updateDateInput(selectedDay);
+                closeCalendarPanel(selectedDay, true);
             })
             .on('click', '.dp-mask', function (e) {
                 foregroundMonthView();
