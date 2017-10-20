@@ -9,6 +9,8 @@ Simple simulation of the native datepicker in the webkit browser, and it is stil
 ## Usage
 ```javascript
 var dp = $('#container').DatePicker();
+// get 
 var dt = dp.val();
+// set 
+dp.val('10/2/2017'); // receive an argument format same as native Date.
 ```
-

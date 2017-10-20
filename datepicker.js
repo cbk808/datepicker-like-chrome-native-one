@@ -712,15 +712,17 @@
     var inputNumbers = [];
     var keyboardInput = false;
 
+    function updateInput() {
+        $domInputYear.text(padYear(inputYear));
+        $domInputMonth.text(padMonthOrDay(inputMonth + 1));
+        $domInputDay.text(padMonthOrDay(inputDay));
+    }
+
     function closeCalendarPanel(dt, delay) {
         var d = new Date(dt);
         inputYear = d.getFullYear();
         inputMonth = d.getMonth();
         inputDay = d.getDate();
-
-        $domInputYear.text(padYear(inputYear));
-        $domInputMonth.text(padMonthOrDay(inputMonth + 1));
-        $domInputDay.text(padMonthOrDay(inputDay));
 
         if (delay) {
             setTimeout(function() {
@@ -1331,7 +1333,16 @@
             initTimeInput();
             initInteraction(this);
         },
-        val: function() {
+        val: function(v) {
+            var d;
+            if (v) {
+                d = new Date(v);
+                inputYear = d.getFullYear();
+                inputMonth = d.getMonth();
+                inputDay = d.getDate();
+                updateInput();
+            }
+
             if (isInputDateValid()) {
                 return padYear(inputYear) + '-' + padMonthOrDay(inputMonth + 1) + '-' + padMonthOrDay(inputDay);
             } else {
