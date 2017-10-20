@@ -723,6 +723,7 @@
         inputYear = d.getFullYear();
         inputMonth = d.getMonth();
         inputDay = d.getDate();
+        updateInput();
 
         if (delay) {
             setTimeout(function() {
