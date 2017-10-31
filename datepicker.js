@@ -1219,7 +1219,7 @@
         defaults = $.extend(defaults, options);
 
         this.id = generateUniqueId();
-        today = Date.now();
+        today = Math.floor(Date.now()/(24*3600*1000))*(24*3600*1000);
         currentOffset = getOffset(today);
         $domContainer = $(defaults.container);
         $domMain = $(Templates.panel);
